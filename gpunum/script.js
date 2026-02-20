@@ -7,6 +7,7 @@ let canvasW, canvasH;
 const textToType = "import gpunum";
 let charIndex = 0;
 
+// Set up Canvas dimensions
 function resize() {
     canvasW = canvas.width = window.innerWidth;
     canvasH = canvas.height = window.innerHeight;
@@ -14,121 +15,129 @@ function resize() {
 window.onresize = resize;
 resize();
 
-// --- 1. TYPING ---
+// --- STEP 1: TYPING EFFECT ---
 function typeEffect() {
     if (charIndex < textToType.length) {
         codeElement.textContent += textToType.charAt(charIndex);
         charIndex++;
-        setTimeout(typeEffect, 80);
+        setTimeout(typeEffect, 80); 
     } else {
-        setTimeout(startTransition, 1000);
+        // Wait a second after typing before moving the text
+        setTimeout(() => {
+            container.classList.add('move-left');
+            // Wait for the slide to progress before starting lines
+            setTimeout(initAnimation, 400); 
+        }, 800);
     }
 }
 
-function startTransition() {
-    container.classList.add('move-left');
-    setTimeout(initDots, 500);
-}
-
-// --- 2. DOTS AND MERGE LOGIC ---
+// --- STEP 2: LINE INITIALIZATION ---
 let lines = [];
-let state = "growing"; // states: growing, merging
+let animationActive = false;
 
-function initDots() {
+function initAnimation() {
     const centerY = canvasH / 2;
-    const spacing = 60;
-    // We start with 5 positions
+    const spacing = 110;
+    // Start lines at 30% width to stay clear of the tucked text
+    const startX = canvasW * 0.30; 
+
     for (let i = -2; i <= 2; i++) {
         lines.push({
-            y: centerY + (i * spacing),
-            xStart: canvasW * 0.4,
-            xEnd: canvasW * 0.4, // Start as dots (0 length)
-            active: true
+            originY: centerY + (i * spacing),
+            currentY: centerY + (i * spacing),
+            x: startX,
+            headX: startX,
+            indent: Math.abs(i) * 110, // Staggering for the pyramid look
+            color: i === 0 ? '#7c3aed' : '#cbd5e1', // Purple center, Light Gray neighbors
+            isMain: i === 0
         });
     }
+
+    // Sort so the Purple line (isMain) is drawn LAST (appears on top)
+    lines.sort((a, b) => (a.isMain === b.isMain ? 0 : a.isMain ? 1 : -1));
+
+    animationActive = true;
     animate();
 }
 
+// --- STEP 3: CORE ANIMATION LOOP ---
 function animate() {
+    if (!animationActive) return;
     ctx.clearRect(0, 0, canvasW, canvasH);
-    const targetLength = canvasW * 0.4;
-    let allGrown = true;
+    
+    const centerY = canvasH / 2;
+    // Trigger the 45-degree turn 60% across the screen
+    const diagonalTrigger = canvasW * 0.60; 
+    const lineStartX = canvasW * 0.30;
 
-    // Draw the lines
-    lines.forEach((line, i) => {
-        if (!line.active) return;
-
+    lines.forEach((line) => {
         ctx.beginPath();
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 10; 
         ctx.lineCap = 'round';
-        ctx.strokeStyle = i === 2 ? '#2dd4bf' : '#1e293b'; // Center line is teal
+        ctx.strokeStyle = line.color;
 
-        // Growth phase
-        if (line.xEnd < (line.xStart + targetLength)) {
-            line.xEnd += 8;
-            allGrown = false;
+        // Draw path from start
+        ctx.moveTo(lineStartX, line.originY);
+
+        let straightEnd = diagonalTrigger + line.indent;
+        
+        if (line.headX < straightEnd) {
+            // Still in the straight parallel phase
+            ctx.lineTo(line.headX, line.originY);
+        } else {
+            // 45-degree snap phase
+            ctx.lineTo(straightEnd, line.originY);
+            
+            let distPastTrigger = line.headX - straightEnd;
+            let targetYDist = centerY - line.originY;
+            
+            // Y moves at the same pace as X to maintain a 45-degree angle
+            let yOffset = Math.sign(targetYDist) * distPastTrigger;
+            
+            // Check if we've hit the center convergence line
+            if (Math.abs(yOffset) >= Math.abs(targetYDist)) {
+                // Flatten back out to a straight line
+                ctx.lineTo(straightEnd + Math.abs(targetYDist), centerY);
+                ctx.lineTo(line.headX, centerY);
+                line.currentY = centerY;
+            } else {
+                // Moving diagonally
+                ctx.lineTo(line.headX, line.originY + yOffset);
+                line.currentY = line.originY + yOffset;
+            }
         }
-
-        ctx.moveTo(line.xStart, line.y);
-        ctx.lineTo(line.xEnd, line.y);
         ctx.stroke();
 
-        // Draw the "Circle" at the start
+        // DRAW THE HEAD CIRCLE
         ctx.beginPath();
-        ctx.arc(line.xStart, line.y, 5, 0, Math.PI * 2);
-        ctx.fillStyle = ctx.strokeStyle;
+        ctx.arc(line.headX, line.currentY, 14, 0, Math.PI * 2);
+        ctx.fillStyle = line.color;
         ctx.fill();
-    });
 
-    if (allGrown && state === "growing") {
-        state = "merging";
-        setTimeout(mergeOuterLines, 800);
-    }
+        // Increment position (Slower for a cinematic feel)
+        if (line.headX < canvasW * 0.95) {
+            line.headX += 6; 
+        }
+    });
 
     requestAnimationFrame(animate);
 }
 
-// --- 3. RECURSIVE STRAIGHT MERGE ---
-function mergeOuterLines() {
-    // Stage 1: Move outermost (0 and 4) to their neighbors (1 and 3)
-    let targets = [
-        { subject: 0, target: 1 },
-        { subject: 4, target: 3 }
-    ];
-
-    performStepMerge(targets, () => {
-        // Stage 2: Move new outermost (1 and 3) to center (2)
-        let finalTargets = [
-            { subject: 1, target: 2 },
-            { subject: 3, target: 2 }
-        ];
-        setTimeout(() => performStepMerge(finalTargets), 600);
-    });
-}
-
-function performStepMerge(pairs, callback) {
-    let completed = 0;
-    const step = () => {
-        let moving = false;
-        pairs.forEach(pair => {
-            const sub = lines[pair.subject];
-            const tar = lines[pair.target];
-            
-            if (Math.abs(sub.y - tar.y) > 2) {
-                sub.y += (tar.y - sub.y) * 0.15; // Straight vertical movement
-                moving = true;
-            } else {
-                sub.active = false; // "Merged"
-            }
-        });
-
-        if (moving) {
-            requestAnimationFrame(step);
-        } else if (callback) {
-            callback();
-        }
-    };
-    step();
-}
-
+// Kick off the sequence
 typeEffect();
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.key === 'r') {
+        // Reset Text
+        charIndex = 0;
+        codeElement.textContent = "";
+        container.classList.remove('move-left');
+        
+        // Reset Lines
+        animationActive = false;
+        lines = [];
+        
+        // Restart Sequence
+        typeEffect();
+    }
+});
