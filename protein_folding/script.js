@@ -4,10 +4,10 @@ const ctx = canvas.getContext('2d');
 let width, height;
 let alpha = 0;
 let targetAlpha = 0;
-const numAcids = 40;
+const numAcids = 36; // Slightly fewer for a cleaner vertical fit
 const acids = [];
 
-// Distinctive "Protein" palette (Purples/Lavenders)
+// Clean biotech palette
 const colors = ['#4c1d95', '#6d28d9', '#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd'];
 
 function init() {
@@ -18,23 +18,22 @@ function init() {
 
     acids.length = 0;
     for (let i = 0; i < numAcids; i++) {
-        // Helix parameters
         const spiralRadius = 55;
         const pitch = 18;
-        const rotationSpeed = 0.7;
+        const rotationSpeed = 0.8;
 
         acids.push({
-            // Start State: Linear segmented line
-            x1: (width * 0.1) + (i * 22),
+            // Start State: Centered Horizontal Line
+            x1: (width * 0.5) - (numAcids * 10) + (i * 20),
             y1: height / 2,
             
-            // End State: Alpha Helix coordinates
-            x2: (width * 0.25) + (i * pitch),
+            // End State: Centered Alpha Helix
+            x2: (width * 0.5) - (numAcids * 8) + (i * pitch),
             y2: height / 2 + Math.sin(i * rotationSpeed) * spiralRadius,
             z2: Math.cos(i * rotationSpeed) * spiralRadius,
             
             color: colors[i % colors.length],
-            size: i % 4 === 0 ? 12 : 8 // Some "side chains" are larger
+            size: i % 3 === 0 ? 11 : 7
         });
     }
 }
@@ -43,34 +42,24 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 
 function draw() {
     ctx.clearRect(0, 0, width, height);
+    alpha += (targetAlpha - alpha) * 0.05;
 
-    // Smooth transition progress
-    alpha += (targetAlpha - alpha) * 0.06;
-
-    // Draw connecting segments first (to stay behind beads)
-    ctx.lineWidth = 4;
-    for (let i = 0; i < numAcids - 1; i++) {
-        const a1 = acids[i];
-        const a2 = acids[i+1];
-        
-        const x1 = lerp(a1.x1, a1.x2, alpha);
-        const y1 = lerp(a1.y1, a1.y2, alpha);
-        const x2 = lerp(a2.x1, a2.x2, alpha);
-        const y2 = lerp(a2.y1, a2.y2, alpha);
-
-        ctx.beginPath();
-        ctx.strokeStyle = '#e2e8f0'; // Subtle backbone line
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
+    // 1. Draw thin connecting backbone
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.beginPath();
+    for (let i = 0; i < numAcids; i++) {
+        const x = lerp(acids[i].x1, acids[i].x2, alpha);
+        const y = lerp(acids[i].y1, acids[i].y2, alpha);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
     }
+    ctx.stroke();
 
-    // Draw individual Amino Acids
-    acids.forEach((a, i) => {
+    // 2. Draw Amino Acids
+    acids.forEach((a) => {
         const x = lerp(a.x1, a.x2, alpha);
         const y = lerp(a.y1, a.y2, alpha);
-        
-        // Simple Z-depth illusion
         const z = lerp(0, a.z2, alpha);
         const scale = (z + 100) / 100;
         const currentSize = a.size * scale;
@@ -80,7 +69,7 @@ function draw() {
         ctx.fillStyle = a.color;
         ctx.fill();
 
-        // High-end gloss for 3D feel
+        // 3D Highlight
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.beginPath();
         ctx.arc(x - currentSize/3, y - currentSize/3, currentSize/4, 0, Math.PI * 2);
@@ -92,7 +81,6 @@ function draw() {
 
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') targetAlpha = (targetAlpha === 0 ? 1 : 0);
-    if (e.key === 'r') targetAlpha = 0;
 });
 
 init();
