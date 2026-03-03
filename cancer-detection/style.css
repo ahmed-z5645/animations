@@ -1,6 +1,6 @@
 body {
   margin: 0;
-  background-color: #0b1120;
+  background-color: #020617; 
   height: 100vh;
   display: flex;
   align-items: center;
@@ -8,7 +8,30 @@ body {
   overflow: hidden;
 }
 
+#recording-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  border: 2px dashed #475569; 
+  border-radius: 12px;
+  background-color: #0f172a;
+}
+
+.hint {
+  color: #94a3b8;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  margin-bottom: 16px;
+}
+
 canvas {
-  width: 750px;
-  height: 600px;
+  /* 16:9 Aspect Ratio */
+  width: 800px;
+  height: 450px;
+  background-color: #0b1120; 
+  box-shadow: 0 0 0 1px #1e293b; 
+  border-radius: 4px;
 }
